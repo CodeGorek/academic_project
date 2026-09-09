@@ -1,0 +1,14 @@
+{% extends 'academic/base.html' %}
+{% block content %}
+<div class="p-5 mb-4 bg-white rounded-3 shadow-sm border">
+    <div class="container-fluid py-3">
+        <h1 class="display-5 fw-bold text-dark">Plataforma Académica Institucional</h1>
+        <p class="col-md-8 fs-4 text-secondary">Sistema integrado con Django REST Framework y consumo asíncrono mediante JavaScript Fetch.</p>
+        <hr class="my-4">
+        <p>Seleccione una opción para gestionar los registros académicos con control de activación y deshabilitación lógica.</p>
+        <a class="btn btn-dark btn-lg" href="{% url 'teachers' %}" role="button"><i class="fa-solid fa-chalkboard-user me-2"></i>Gestionar Docentes</a>
+        <a class="btn btn-primary btn-lg ms-2" href="{% url 'courses' %}" role="button"><i class="fa-solid fa-book me-2"></i>Gestionar Cursos</a>
+        <a class="btn btn-outline-secondary btn-lg ms-2" href="{% url 'students' %}" role="button"><i class="fa-solid fa-users me-2"></i>Gestionar Estudiantes</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends 'academic/base.html' %}
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h2 class="fw-bold text-dark"><i class="fa-solid fa-user-plus me-2"></i>Inscripción de Estudiantes en Cursos</h2>
+    </div>
+    <div class="col text-end">
+        <button class="btn btn-success shadow-sm" data-bs-toggle="modal" data-bs-target="#enrollmentModal" onclick="openCreateModal()">
+            <i class="fa-solid fa-plus me-1"></i> Nueva Inscripción
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Estudiante</th>
+                        <th>Curso</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="enrollmentTableBody">
+                    <!-- Dinámico vía JavaScript Fetch -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Formulario -->
+<div class="modal fade" id="enrollmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="modalTitle">Inscribir Estudiante</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="enrollmentForm">
+                    <input type="hidden" id="enrollmentId">
+                    <div class="mb-3">
+                        <label class="form-label">Seleccionar Estudiante</label>
+                        <select class="form-select" id="studentSelect" required>
+                            <option value="" disabled selected>Cargando estudiantes...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Seleccionar Curso</label>
+                        <select class="form-select" id="courseSelect" required>
+                            <option value="" disabled selected>Cargando cursos...</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 shadow-sm">Guardar Inscripción</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const apiURL = '/api/student-courses/';
+const studentsURL = '/api/students/';
+const coursesURL = '/api/courses/';
+
+let studentsCache = [];
+let coursesCache = [];
+
+async function loadDropdowns(selectedStudentId = null, selectedCourseId = null) {
+    try {
+        const [resStudents, resCourses] = await Promise.all([
+            fetch(studentsURL),
+            fetch(coursesURL)
+        ]);
+        studentsCache = await resStudents.json();
+        coursesCache = await resCourses.json();
+
+        const studentSelect = document.getElementById('studentSelect');
+        const courseSelect = document.getElementById('courseSelect');
+
+        studentSelect.innerHTML = '<option value="" disabled selected>Seleccione un estudiante...</option>';
+        studentsCache.forEach(s => {
+            if (s.is_active) {
+                let sel = (s.id === selectedStudentId) ? 'selected' : '';
+                studentSelect.innerHTML += `<option value="${s.id}" ${sel}>${s.first_name} ${s.last_name}</option>`;
+            }
+        });
+
+        courseSelect.innerHTML = '<option value="" disabled selected>Seleccione un curso...</option>';
+        coursesCache.forEach(c => {
+            if (c.is_active) {
+                let sel = (c.id === selectedCourseId) ? 'selected' : '';
+                courseSelect.innerHTML += `<option value="${c.id}" ${sel}>${c.name}</option>`;
+            }
+        });
+    } catch (err) {
+        console.error('Error al cargar listas desplegables:', err);
+    }
+}
+
+async function loadEnrollments() {
+    try {
+        const response = await fetch(apiURL);
+        const data = await response.json();
+
+        // Asegurarnos de tener los catálogos cargados para mostrar nombres
+        if (studentsCache.length === 0 || coursesCache.length === 0) {
+            const [resS, resC] = await Promise.all([fetch(studentsURL), fetch(coursesURL)]);
+            studentsCache = await resS.json();
+            coursesCache = await resC.json();
+        }
+
+        const tbody = document.getElementById('enrollmentTableBody');
+        tbody.innerHTML = '';
+
+        data.forEach(item => {
+            const studentObj = studentsCache.find(s => s.id === item.student);
+            const courseObj = coursesCache.find(c => c.id === item.course);
+
+            const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : `Estudiante ID: ${item.student}`;
+            const courseName = courseObj ? courseObj.name : `Curso ID: ${item.course}`;
+
+            let statusBadge = item.is_active 
+                ? '<span class="badge bg-success">Activo</span>' 
+                : '<span class="badge bg-danger">Deshabilitado</span>';
+            
+            let toggleBtnText = item.is_active ? 'Deshabilitar' : 'Activar';
+            let toggleBtnClass = item.is_active ? 'btn-outline-warning' : 'btn-outline-success';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td class="fw-semibold"><i class="fa-solid fa-user text-secondary me-1"></i> ${studentName}</td>
+                    <td><i class="fa-solid fa-book text-secondary me-1"></i> ${courseName}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editEnrollment(${item.id}, ${item.student}, ${item.course})"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm ${toggleBtnClass}" onclick="toggleStatus(${item.id}, ${item.student}, ${item.course}, ${item.is_active})">${toggleBtnText}</button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error('Error al cargar inscripciones:', error);
+    }
+}
+
+async function openCreateModal() {
+    document.getElementById('modalTitle').innerText = 'Inscribir Estudiante';
+    document.getElementById('enrollmentId').value = '';
+    await loadDropdowns();
+}
+
+async function editEnrollment(id, studentId, courseId) {
+    document.getElementById('modalTitle').innerText = 'Editar Inscripción';
+    document.getElementById('enrollmentId').value = id;
+    await loadDropdowns(studentId, courseId);
+    new bootstrap.Modal(document.getElementById('enrollmentModal')).show();
+}
+
+async function toggleStatus(id, studentId, courseId, currentStatus) {
+    const response = await fetch(`${apiURL}${id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student: studentId, course: courseId, is_active: !currentStatus })
+    });
+    if (response.ok) {
+        loadEnrollments();
+    }
+}
+
+document.getElementById('enrollmentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('enrollmentId').value;
+    const student = document.getElementById('studentSelect').value;
+    const course = document.getElementById('courseSelect').value;
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `${apiURL}${id}/` : apiURL;
+
+    const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student, course, is_active: true })
+    });
+
+    if (response.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('enrollmentModal')).hide();
+        loadEnrollments();
+    }
+});
+
+loadEnrollments();
+</script>
+{% endblock %}

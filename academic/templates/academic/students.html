@@ -1,0 +1,147 @@
+{% extends 'academic/base.html' %}
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h2 class="fw-bold text-dark"><i class="fa-solid fa-users me-2"></i>Gestión de Estudiantes</h2>
+    </div>
+    <div class="col text-end">
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#studentModal" onclick="openCreateModal()">
+            <i class="fa-solid fa-plus me-1"></i> Nuevo Estudiante
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Apellido</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="studentTableBody">
+                    <!-- Dinámico vía JavaScript Fetch -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Formulario -->
+<div class="modal fade" id="studentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="modalTitle">Registrar Estudiante</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="studentForm">
+                    <input type="hidden" id="studentId">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="firstName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Apellido</label>
+                        <input type="text" class="form-control" id="lastName" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 shadow-sm">Guardar Registro</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const apiURL = '/api/students/';
+
+async function loadStudents() {
+    try {
+        const response = await fetch(apiURL);
+        const data = await response.json();
+        const tbody = document.getElementById('studentTableBody');
+        tbody.innerHTML = '';
+        data.forEach(student => {
+            let statusBadge = student.is_active 
+                ? '<span class="badge bg-success">Activo</span>' 
+                : '<span class="badge bg-danger">Deshabilitado</span>';
+            
+            let toggleBtnText = student.is_active ? 'Deshabilitar' : 'Activar';
+            let toggleBtnClass = student.is_active ? 'btn-outline-warning' : 'btn-outline-success';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${student.id}</td>
+                    <td class="fw-semibold">${student.first_name}</td>
+                    <td>${student.last_name}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editStudent(${student.id}, '${student.first_name}', '${student.last_name}')"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm ${toggleBtnClass}" onclick="toggleStatus(${student.id}, '${student.first_name}', '${student.last_name}', ${student.is_active})">${toggleBtnText}</button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error('Error al cargar estudiantes:', error);
+    }
+}
+
+function openCreateModal() {
+    document.getElementById('modalTitle').innerText = 'Registrar Estudiante';
+    document.getElementById('studentId').value = '';
+    document.getElementById('firstName').value = '';
+    document.getElementById('lastName').value = '';
+}
+
+function editStudent(id, firstName, lastName) {
+    document.getElementById('modalTitle').innerText = 'Editar Estudiante';
+    document.getElementById('studentId').value = id;
+    document.getElementById('firstName').value = firstName;
+    document.getElementById('lastName').value = lastName;
+    new bootstrap.Modal(document.getElementById('studentModal')).show();
+}
+
+async function toggleStatus(id, firstName, lastName, currentStatus) {
+    const response = await fetch(`${apiURL}${id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ first_name: firstName, last_name: lastName, is_active: !currentStatus })
+    });
+    if (response.ok) {
+        loadStudents();
+    }
+}
+
+document.getElementById('studentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('studentId').value;
+    const first_name = document.getElementById('firstName').value;
+    const last_name = document.getElementById('lastName').value;
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `${apiURL}${id}/` : apiURL;
+
+    const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ first_name, last_name, is_active: true })
+    });
+
+    if (response.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('studentModal')).hide();
+        loadStudents();
+    }
+});
+
+loadStudents();
+</script>
+{% endblock %}

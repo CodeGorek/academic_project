@@ -1,0 +1,170 @@
+{% extends 'academic/base.html' %}
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h2 class="fw-bold text-dark"><i class="fa-solid fa-book me-2"></i>Administración de Cursos</h2>
+    </div>
+    <div class="col text-end">
+        <button class="btn btn-success shadow-sm" data-bs-toggle="modal" data-bs-target="#courseModal" onclick="openCreateModal()">
+            <i class="fa-solid fa-plus me-1"></i> Nuevo Curso
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre del Curso</th>
+                        <th>Docente Asignado</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="courseTableBody">
+                    <!-- Cargado dinámicamente con JS Fetch -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Formulario -->
+<div class="modal fade" id="courseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="modalTitle">Registrar Curso</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="courseForm">
+                    <input type="hidden" id="courseId">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre del Curso</label>
+                        <input type="text" class="form-control" id="courseName" required placeholder="Ej: Arquitectura de Software">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Docente Asignado</label>
+                        <select class="form-select" id="teacherSelect" required>
+                            <option value="" disabled selected>Seleccione un docente...</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 shadow-sm">Guardar Registro</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const apiURL = '/api/courses/';
+const teacherApiURL = '/api/teachers/';
+
+// Función para cargar el selector de docentes en el modal
+async function loadTeachersDropdown(selectedTeacherId = null) {
+    try {
+        const response = await fetch(teacherApiURL);
+        const teachers = await response.json();
+        const select = document.getElementById('teacherSelect');
+        select.innerHTML = '<option value="" disabled selected>Seleccione un docente...</option>';
+        
+        teachers.forEach(teacher => {
+            if (teacher.is_active) { // Solo mostrar docentes activos
+                let selected = (teacher.id === selectedTeacherId) ? 'selected' : '';
+                select.innerHTML += `<option value="${teacher.id}" ${selected}>${teacher.first_name} ${teacher.last_name}</option>`;
+            }
+        });
+    } catch (error) {
+        console.error('Error al cargar docentes para el selector:', error);
+    }
+}
+
+async function loadCourses() {
+    try {
+        const response = await fetch(apiURL);
+        const data = await response.json();
+        const tbody = document.getElementById('courseTableBody');
+        tbody.innerHTML = '';
+        
+        data.forEach(course => {
+            let statusBadge = course.is_active 
+                ? '<span class="badge bg-success">Activo</span>' 
+                : '<span class="badge bg-danger">Deshabilitado</span>';
+            
+            let toggleBtnText = course.is_active ? 'Deshabilitar' : 'Activar';
+            let toggleBtnClass = course.is_active ? 'btn-outline-warning' : 'btn-outline-success';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${course.id}</td>
+                    <td class="fw-semibold">${course.name}</td>
+                    <td><i class="fa-solid fa-chalkboard-user text-secondary me-1"></i> ${course.teacher_name || 'Sin Asignar'}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editCourse(${course.id}, '${course.name}', ${course.teacher})"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm ${toggleBtnClass}" onclick="toggleStatus(${course.id}, '${course.name}', ${course.teacher}, ${course.is_active})">${toggleBtnText}</button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (error) {
+        console.error('Error al cargar cursos:', error);
+    }
+}
+
+async function openCreateModal() {
+    document.getElementById('modalTitle').innerText = 'Registrar Curso';
+    document.getElementById('courseId').value = '';
+    document.getElementById('courseName').value = '';
+    await loadTeachersDropdown();
+}
+
+async function editCourse(id, name, teacherId) {
+    document.getElementById('modalTitle').innerText = 'Editar Curso';
+    document.getElementById('courseId').value = id;
+    document.getElementById('courseName').value = name;
+    await loadTeachersDropdown(teacherId);
+    new bootstrap.Modal(document.getElementById('courseModal')).show();
+}
+
+async function toggleStatus(id, name, teacherId, currentStatus) {
+    const response = await fetch(`${apiURL}${id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, teacher: teacherId, is_active: !currentStatus })
+    });
+    if (response.ok) {
+        loadCourses();
+    }
+}
+
+document.getElementById('courseForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('courseId').value;
+    const name = document.getElementById('courseName').value;
+    const teacher = document.getElementById('teacherSelect').value;
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `${apiURL}${id}/` : apiURL;
+
+    const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, teacher, is_active: true })
+    });
+
+    if (response.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('courseModal')).hide();
+        loadCourses();
+    }
+});
+
+loadCourses();
+</script>
+{% endblock %}

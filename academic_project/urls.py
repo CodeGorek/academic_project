@@ -31,6 +31,7 @@ router.register(r'student-courses', StudentCourseViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/', include('django.contrib.auth.urls')), # Rutas de login/logout de Django
     path('api/', include(router.urls)),
     path('', index_view, name='index'),
     path('courses/', courses_view, name='courses'),

@@ -17,14 +17,33 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{% url 'index' %}">Inicio</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'teachers' %}">Docentes</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">Cursos</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'students' %}">Estudiantes</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'enrollments' %}">Inscripciones</a></li>
-            </ul>
-        </div>
+                <!-- Enlaces visibles para todo el público -->
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'index' %}">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'teachers' %}">Docentes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'courses' %}">Cursos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'students' %}">Estudiantes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'enrollments' %}">Inscripciones</a></li>
+                </ul>
+
+                <!-- Botones de Autenticación a la derecha -->
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item ms-lg-3">
+                            <form action="{% url 'logout' %}" method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-light btn-sm"><i class="fa-solid fa-right-from-bracket me-1"></i>Cerrar Sesión</button>
+                            </form>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link btn btn-outline-light btn-sm px-3 text-white" href="{% url 'login' %}">
+                                <i class="fa-solid fa-right-to-bracket me-1"></i>Iniciar Sesión
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
     </nav>
 

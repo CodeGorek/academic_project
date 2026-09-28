@@ -2,13 +2,15 @@
 {% block content %}
 <div class="row mb-4 align-items-center">
     <div class="col">
-        <h2 class="fw-bold text-dark"><i class="fa-solid fa-user-plus me-2"></i>Inscripción de Estudiantes en Cursos</h2>
+        <h2 class="fw-bold text-dark"><i class="fa-solid fa-user-graduate me-2"></i>Inscripciones Consolidadas por Estudiante</h2>
     </div>
+    {% if user.is_authenticated %}
     <div class="col text-end">
         <button class="btn btn-success shadow-sm" data-bs-toggle="modal" data-bs-target="#enrollmentModal" onclick="openCreateModal()">
-            <i class="fa-solid fa-plus me-1"></i> Nueva Inscripción
+            <i class="fa-solid fa-plus me-1"></i> Asignar Curso a Estudiante
         </button>
     </div>
+    {% endif %}
 </div>
 
 <div class="card shadow-sm border-0">
@@ -17,42 +19,42 @@
             <table class="table table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th>ID</th>
+                        <th>ID Estudiante</th>
                         <th>Estudiante</th>
-                        <th>Curso</th>
-                        <th>Estado</th>
+                        <th>Cursos Inscritos</th>
                         <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="enrollmentTableBody">
-                    <!-- Dinámico vía JavaScript Fetch -->
+                    <!-- Dinámico vía JavaScript -->
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
-<!-- Modal Formulario -->
+<!-- Modal Formulario (Solo visible para usuarios autenticados) -->
+{% if user.is_authenticated %}
 <div class="modal fade" id="enrollmentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="modalTitle">Inscribir Estudiante</h5>
+                <h5 class="modal-title" id="modalTitle">Inscribir Curso</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="enrollmentForm">
                     <input type="hidden" id="enrollmentId">
                     <div class="mb-3">
-                        <label class="form-label">Seleccionar Estudiante</label>
+                        <label class="form-label">Estudiante</label>
                         <select class="form-select" id="studentSelect" required>
-                            <option value="" disabled selected>Cargando estudiantes...</option>
+                            <option value="" disabled selected>Cargando...</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Seleccionar Curso</label>
+                        <label class="form-label">Curso</label>
                         <select class="form-select" id="courseSelect" required>
-                            <option value="" disabled selected>Cargando cursos...</option>
+                            <option value="" disabled selected>Cargando...</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-dark w-100 shadow-sm">Guardar Inscripción</button>
@@ -61,6 +63,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -69,133 +72,134 @@ const apiURL = '/api/student-courses/';
 const studentsURL = '/api/students/';
 const coursesURL = '/api/courses/';
 
-let studentsCache = [];
-let coursesCache = [];
+const badgeColors = ['primary', 'success', 'danger', 'warning', 'info', 'dark', 'secondary'];
 
-async function loadDropdowns(selectedStudentId = null, selectedCourseId = null) {
+async function loadGroupedEnrollments() {
     try {
-        const [resStudents, resCourses] = await Promise.all([
+        const [resEnrollments, resStudents, resCourses] = await Promise.all([
+            fetch(apiURL),
             fetch(studentsURL),
             fetch(coursesURL)
         ]);
-        studentsCache = await resStudents.json();
-        coursesCache = await resCourses.json();
+        
+        const enrollments = await resEnrollments.json();
+        const students = await resStudents.json();
+        const courses = await resCourses.json();
 
+        // Llenar selectores del modal si existe
         const studentSelect = document.getElementById('studentSelect');
         const courseSelect = document.getElementById('courseSelect');
-
-        studentSelect.innerHTML = '<option value="" disabled selected>Seleccione un estudiante...</option>';
-        studentsCache.forEach(s => {
-            if (s.is_active) {
-                let sel = (s.id === selectedStudentId) ? 'selected' : '';
-                studentSelect.innerHTML += `<option value="${s.id}" ${sel}>${s.first_name} ${s.last_name}</option>`;
-            }
-        });
-
-        courseSelect.innerHTML = '<option value="" disabled selected>Seleccione un curso...</option>';
-        coursesCache.forEach(c => {
-            if (c.is_active) {
-                let sel = (c.id === selectedCourseId) ? 'selected' : '';
-                courseSelect.innerHTML += `<option value="${c.id}" ${sel}>${c.name}</option>`;
-            }
-        });
-    } catch (err) {
-        console.error('Error al cargar listas desplegables:', err);
-    }
-}
-
-async function loadEnrollments() {
-    try {
-        const response = await fetch(apiURL);
-        const data = await response.json();
-
-        // Asegurarnos de tener los catálogos cargados para mostrar nombres
-        if (studentsCache.length === 0 || coursesCache.length === 0) {
-            const [resS, resC] = await Promise.all([fetch(studentsURL), fetch(coursesURL)]);
-            studentsCache = await resS.json();
-            coursesCache = await resC.json();
+        if (studentSelect && courseSelect) {
+            studentSelect.innerHTML = '<option value="" disabled selected>Seleccione un estudiante...</option>';
+            students.forEach(s => { if(s.is_active) studentSelect.innerHTML += `<option value="${s.id}">${s.first_name} ${s.last_name}</option>`; });
+            
+            courseSelect.innerHTML = '<option value="" disabled selected>Seleccione un curso...</option>';
+            courses.forEach(c => { if(c.is_active) courseSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
         }
+
+        // Agrupar cursos activos por estudiante
+        const studentMap = {};
+        students.forEach(s => {
+            studentMap[s.id] = {
+                id: s.id,
+                name: `${s.first_name} ${s.last_name}`,
+                courses: []
+            };
+        });
+
+        enrollments.forEach(item => {
+            if (item.is_active && studentMap[item.student]) {
+                const courseObj = courses.find(c => c.id === item.course);
+                if (courseObj) {
+                    studentMap[item.student].courses.push({
+                        enrollmentId: item.id,
+                        courseName: courseObj.name
+                    });
+                }
+            }
+        });
 
         const tbody = document.getElementById('enrollmentTableBody');
         tbody.innerHTML = '';
 
-        data.forEach(item => {
-            const studentObj = studentsCache.find(s => s.id === item.student);
-            const courseObj = coursesCache.find(c => c.id === item.course);
+        Object.values(studentMap).forEach(student => {
+            if (student.courses.length > 0) {
+                let coursesBadges = '';
+                student.courses.forEach((c, index) => {
+                    let colorClass = badgeColors[index % badgeColors.length];
+                    coursesBadges += `<span class="badge bg-${colorClass} me-1 p-2 fs-6 mb-1">${c.courseName} 
+                        {% if user.is_authenticated %}<i class="fa-solid fa-xmark ms-1 text-white" style="cursor:pointer;" title="Desactivar" onclick="removeEnrollment(${c.enrollmentId})"></i>{% endif %}
+                    </span>`;
+                });
 
-            const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : `Estudiante ID: ${item.student}`;
-            const courseName = courseObj ? courseObj.name : `Curso ID: ${item.course}`;
-
-            let statusBadge = item.is_active 
-                ? '<span class="badge bg-success">Activo</span>' 
-                : '<span class="badge bg-danger">Deshabilitado</span>';
-            
-            let toggleBtnText = item.is_active ? 'Deshabilitar' : 'Activar';
-            let toggleBtnClass = item.is_active ? 'btn-outline-warning' : 'btn-outline-success';
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${item.id}</td>
-                    <td class="fw-semibold"><i class="fa-solid fa-user text-secondary me-1"></i> ${studentName}</td>
-                    <td><i class="fa-solid fa-book text-secondary me-1"></i> ${courseName}</td>
-                    <td>${statusBadge}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editEnrollment(${item.id}, ${item.student}, ${item.course})"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn btn-sm ${toggleBtnClass}" onclick="toggleStatus(${item.id}, ${item.student}, ${item.course}, ${item.is_active})">${toggleBtnText}</button>
-                    </td>
-                </tr>
-            `;
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${student.id}</td>
+                        <td class="fw-semibold"><i class="fa-solid fa-user text-secondary me-1"></i> ${student.name}</td>
+                        <td>${coursesBadges}</td>
+                        <td class="text-end">
+                            {% if user.is_authenticated %}
+                            <button class="btn btn-sm btn-outline-success" onclick="quickAdd(${student.id})"><i class="fa-solid fa-plus me-1"></i>Agregar otro curso</button>
+                            {% else %}
+                            <span class="text-muted small">Solo lectura</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                `;
+            }
         });
     } catch (error) {
-        console.error('Error al cargar inscripciones:', error);
+        console.error('Error al procesar inscripciones:', error);
     }
 }
 
-async function openCreateModal() {
-    document.getElementById('modalTitle').innerText = 'Inscribir Estudiante';
+function openCreateModal() {
     document.getElementById('enrollmentId').value = '';
-    await loadDropdowns();
-}
-
-async function editEnrollment(id, studentId, courseId) {
-    document.getElementById('modalTitle').innerText = 'Editar Inscripción';
-    document.getElementById('enrollmentId').value = id;
-    await loadDropdowns(studentId, courseId);
     new bootstrap.Modal(document.getElementById('enrollmentModal')).show();
 }
 
-async function toggleStatus(id, studentId, courseId, currentStatus) {
-    const response = await fetch(`${apiURL}${id}/`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student: studentId, course: courseId, is_active: !currentStatus })
-    });
-    if (response.ok) {
-        loadEnrollments();
+function quickAdd(studentId) {
+    openCreateModal();
+    document.getElementById('studentSelect').value = studentId;
+}
+
+async function removeEnrollment(enrollmentId) {
+    if(confirm("¿Deseas desvincular este curso del estudiante?")) {
+        // Desactivación lógica (is_active = false)
+        const res = await fetch(`${apiURL}${enrollmentId}/`);
+        const data = await res.json();
+        
+        const updateRes = await fetch(`${apiURL}${enrollmentId}/`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student: data.student, course: data.course, is_active: false })
+        });
+        if(updateRes.ok) loadGroupedEnrollments();
     }
 }
 
-document.getElementById('enrollmentForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const id = document.getElementById('enrollmentId').value;
-    const student = document.getElementById('studentSelect').value;
-    const course = document.getElementById('courseSelect').value;
-    
-    const method = id ? 'PUT' : 'POST';
-    const url = id ? `${apiURL}${id}/` : apiURL;
+const formElem = document.getElementById('enrollmentForm');
+if(formElem) {
+    formElem.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const student = document.getElementById('studentSelect').value;
+        const course = document.getElementById('courseSelect').value;
+        
+        const response = await fetch(apiURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student, course, is_active: true })
+        });
 
-    const response = await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student, course, is_active: true })
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('enrollmentModal')).hide();
+            loadGroupedEnrollments();
+        } else {
+            alert("Es posible que el estudiante ya esté inscrito en este curso.");
+        }
     });
+}
 
-    if (response.ok) {
-        bootstrap.Modal.getInstance(document.getElementById('enrollmentModal')).hide();
-        loadEnrollments();
-    }
-});
-
-loadEnrollments();
+loadGroupedEnrollments();
 </script>
 {% endblock %}

@@ -1,6 +1,8 @@
 # academic/views.py
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
 from .models import Teacher, Course, Student, StudentCourse
 from .serializers import TeacherSerializer, CourseSerializer, StudentSerializer, StudentCourseSerializer
 
@@ -20,6 +22,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 class StudentCourseViewSet(viewsets.ModelViewSet):
     queryset = StudentCourse.objects.all()
     serializer_class = StudentCourseSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly] # Lectura pública, escritura protegida por Login
 
 # --- ViewSets para la API REST (DRF) ---
 class TeacherViewSet(viewsets.ModelViewSet):
@@ -39,15 +42,18 @@ class StudentCourseViewSet(viewsets.ModelViewSet):
     serializer_class = StudentCourseSerializer
 
 # --- Vistas para las Interfaces Web ---
+@login_required
 def index_view(request):
     return render(request, 'academic/index.html')
-
+@login_required
 def courses_view(request):
     return render(request, 'academic/courses.html')
 
+@login_required
 def students_view(request):
     return render(request, 'academic/students.html')
 
+@login_required
 def teachers_view(request):
     return render(request, 'academic/teachers.html')
 

@@ -1,0 +1,31 @@
+{% extends 'academic/base.html' %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h4 class="mb-0"><i class="fa-solid fa-right-to-bracket me-2"></i>Iniciar Sesión</h4>
+            </div>
+            <div class="card-body p-4">
+                {% if form.errors %}
+                    <div class="alert alert-danger py-2 small">
+                        Usuario o contraseña incorrectos. Por favor, verifica tus datos.
+                    </div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nombre de Usuario</label>
+                        <input type="text" name="username" class="form-control" required id="id_username" placeholder="Ingresa tu usuario">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Contraseña</label>
+                        <input type="password" name="password" class="form-control" required id="id_password" placeholder="Ingresa tu contraseña">
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 shadow-sm py-2 mt-2">Ingresar al Sistema</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
